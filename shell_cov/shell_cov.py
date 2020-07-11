@@ -2,6 +2,8 @@ import os
 import re
 import subprocess  # nosec
 import sys
+from itertools import groupby
+from operator import itemgetter
 from re import DOTALL, MULTILINE, VERBOSE
 
 DEFAULT_PS4 = '+PS4 + ${BASH_SOURCE} + ${SECONDS}S + L${LINENO} + '
@@ -62,6 +64,25 @@ RE_FUNCTION = re.compile(r'''
     [^\S\r\n]*\n?[^\S\r\n]*        # whitespace, maybe a newline
     {?\s*\n                        # maybe a { with space and or newlines there
     ''', MULTILINE | VERBOSE)
+
+
+def get_range_string(items):
+    '''Convert a list (or comma separated string) of numbers to a range string.
+
+    Based on https://stackoverflow.com/q/9847601/8086281
+    '''
+    if isinstance(items, str):
+        items = items.split(',')
+
+    items = map(int, items)
+    str_list = []
+    for k, g in groupby(enumerate(items), lambda x: x[0]-x[1]):
+        ilist = list(map(itemgetter(1), g))
+        if len(ilist) > 1:
+            str_list.append('{}-{}'.format(ilist[0], ilist[-1]))
+        else:
+            str_list.append('{}'.format(ilist[0]))
+    return ','.join(str_list)
 
 
 def shell_strip_line_continuation(text):
@@ -134,7 +155,7 @@ def get_line_info(actual_lines, seen_lines):
                               str(100 * (len(need)
                                   - len(not_covered)) // len(need))
                               + '%',
-                              ','.join(str(s) for s in sorted(not_covered))])
+                              get_range_string(sorted(not_covered))])
         problem_lines[script] = unrecognised_lines
     return column_values, problem_lines
 

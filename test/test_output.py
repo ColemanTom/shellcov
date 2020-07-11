@@ -43,7 +43,7 @@ class TestOutput(unittest.TestCase):
             shell_cov.COLUMN_HEADINGS,
             ['script1', str(len(ACTUAL_LINES['script1'])),
              str(len(ACTUAL_LINES['script1'])), '0%',
-             ','.join(str(s) for s in ACTUAL_LINES['script1'])],
+             '0-9'],
             ['script2', str(len(ACTUAL_LINES['script1'])),
              str(len(ACTUAL_LINES['script2'])), '0%',
              ','.join(str(s) for s in ACTUAL_LINES['script2'])]
@@ -64,7 +64,7 @@ class TestOutput(unittest.TestCase):
             shell_cov.COLUMN_HEADINGS,
             ['script1', str(len(ACTUAL_LINES['script1'])),
              str(len(ACTUAL_LINES['script1'])), '0%',
-             ','.join(str(s) for s in ACTUAL_LINES['script1'])],
+             '0-9'],
             ['script2', str(len(ACTUAL_LINES['script1'])),
              str(len(ACTUAL_LINES['script2'])), '0%',
              ','.join(str(s) for s in ACTUAL_LINES['script2'])]
@@ -85,7 +85,7 @@ class TestOutput(unittest.TestCase):
             shell_cov.COLUMN_HEADINGS,
             ['script1', str(len(ACTUAL_LINES['script1'])),
              '5', '50%',
-             ','.join(str(s) for s in range(5))],
+             '0-4'],
             ['script2', str(len(ACTUAL_LINES['script1'])),
              '8', '20%',
              ','.join(str(s) for s in range(0, 15, 2))]
@@ -98,3 +98,11 @@ class TestOutput(unittest.TestCase):
         values, problems = shell_cov.get_line_info(ACTUAL_LINES, seen)
         self.assertEqual(values, expected_values)
         self.assertEqual(problems, expected_problems)
+
+    def test_get_range_string_as_string(self):
+        self.assertEqual(shell_cov.get_range_string('1,2,3,4,6,7,8,20'),
+                         '1-4,6-8,20')
+
+    def test_get_range_string_as_list(self):
+        self.assertEqual(shell_cov.get_range_string([1,2,3,4,6,7,8,20]),
+                         '1-4,6-8,20')
