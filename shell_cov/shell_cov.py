@@ -107,10 +107,7 @@ def shell_strip_comments(text):
 
 def shell_strip_heredoc(text):
     d = [g[0] for g in RE_HEREDOC.findall(text)]
-    print(d)
-    print(RE_HEREDOC.findall(text))
     for match in d:
-        print('@@@@@@@@@#@#@$#@$@# ' + match)
         text = _replace_multiline_string_filler_at_start(text, match)
     return text
 
@@ -180,23 +177,31 @@ def display_results(actual_lines, seen_lines):
 
 
 if __name__ == '__main__':
-    test_scripts = sys.argv[1:]
-    test_results = []
-    use_env = os.environ.copy()
-    use_env['PS4'] = DEFAULT_PS4
-    base_cmd = ['/bin/sh', '-x']
-    for s in test_scripts:
-        if not os.path.isfile(s):
-            raise OSError('"{}" does not exist, aborting!'.format(s))
-        proc = subprocess.Popen(base_cmd + [s],  # nosec
-                                env=use_env, stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE)
-        proc.wait()
-        test_results.append(tuple(map(lambda x: x.decode('utf-8'),
-                                      proc.communicate())))
-        print('------- stderr for "{}" -------'.format(s))
-        print(test_results[0][1])
-        print('')
+    # If stdin is not provided, assume a file is provided
+    if sys.stdin.isatty():
+        test_scripts = sys.argv[1:]
+        test_results = []
+        use_env = os.environ.copy()
+        use_env['PS4'] = DEFAULT_PS4
+        base_cmd = ['/bin/sh', '-x']
+        for s in test_scripts:
+            if not os.path.isfile(s):
+                raise OSError('"{}" does not exist, aborting!'.format(s))
+            proc = subprocess.Popen(base_cmd + [s],  # nosec
+                                    env=use_env, stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE)
+            proc.wait()
+            test_results.append(tuple(map(lambda x: x.decode('utf-8'),
+                                          proc.communicate())))
+            print('------- stderr for "{}" -------'.format(s))
+            print(test_results[0][1])
+            print('')
+    else:
+        try:
+            test_scripts = sys.argv[1:]
+        except:
+            test_scripts = []
+        test_results = [('', '\n'.join([l for l in sys.stdin]))]
 
     # Extract lines which have been executed
     script_lines = {}
@@ -208,6 +213,7 @@ if __name__ == '__main__':
                     and line.strip('+').startswith("PS4 + ")):
                 continue
             _, script, duration, lineno, _ = line.split(" + ", 4)
+
             # Do not count the test script as a script
             if script in test_scripts:
                 continue
