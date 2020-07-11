@@ -46,7 +46,7 @@ class TestOutput(unittest.TestCase):
              '0-9'],
             ['script2', str(len(ACTUAL_LINES['script1'])),
              str(len(ACTUAL_LINES['script2'])), '0%',
-             ','.join(str(s) for s in ACTUAL_LINES['script2'])]
+             ', '.join(str(s) for s in ACTUAL_LINES['script2'])]
         ]
         expected_problems = deepcopy(seen)
 
@@ -67,7 +67,7 @@ class TestOutput(unittest.TestCase):
              '0-9'],
             ['script2', str(len(ACTUAL_LINES['script1'])),
              str(len(ACTUAL_LINES['script2'])), '0%',
-             ','.join(str(s) for s in ACTUAL_LINES['script2'])]
+             ', '.join(str(s) for s in ACTUAL_LINES['script2'])]
         ]
         expected_problems = deepcopy(seen)
 
@@ -88,7 +88,7 @@ class TestOutput(unittest.TestCase):
              '0-4'],
             ['script2', str(len(ACTUAL_LINES['script1'])),
              '8', '20%',
-             ','.join(str(s) for s in range(0, 15, 2))]
+             ', '.join(str(s) for s in range(0, 15, 2))]
         ]
         expected_problems = {
             'script1': set(range(10, 15)),
@@ -101,8 +101,8 @@ class TestOutput(unittest.TestCase):
 
     def test_get_range_string_as_string(self):
         self.assertEqual(shell_cov.get_range_string('1,2,3,4,6,7,8,20'),
-                         '1-4,6-8,20')
+                         '1-4, 6-8, 20')
 
     def test_get_range_string_as_list(self):
         self.assertEqual(shell_cov.get_range_string([1, 2, 3, 4, 6, 7, 8, 20]),
-                         '1-4,6-8,20')
+                         '1-4, 6-8, 20')

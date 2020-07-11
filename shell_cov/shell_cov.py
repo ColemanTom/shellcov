@@ -8,6 +8,7 @@ from re import DOTALL, MULTILINE, VERBOSE
 
 DEFAULT_PS4 = '+PS4 + ${BASH_SOURCE} + ${SECONDS}S + L${LINENO} + '
 FILLER = '@@filler@@'
+BASE_CMD = ['/bin/sh', '-x']
 COLUMN_HEADINGS = ['Name', 'Stmts', 'Miss', 'Cover', 'Missing']
 
 # All regex below assume that all lines in the search string have been trimmed
@@ -82,7 +83,7 @@ def get_range_string(items):
             str_list.append('{}-{}'.format(ilist[0], ilist[-1]))
         else:
             str_list.append('{}'.format(ilist[0]))
-    return ','.join(str_list)
+    return ', '.join(str_list)
 
 
 def shell_strip_line_continuation(text):
@@ -172,37 +173,32 @@ def display_results(actual_lines, seen_lines):
         print('  '.join(val.ljust(width) for val, width in zip(row, widths)))
         # Warn about any problem lines as these should be fixed in this script
         if problem_lines[row[0]]:
-            print('**** lines reached that are not understood: ' + ', '.join(
-                str(l) for l in sorted(problem_lines[row[0]])))
+            print('**** lines reached that are not understood: ' +
+                  get_range_string(sorted(problem_lines[row[0]])))
 
 
-if __name__ == '__main__':
+def get_test_results(test_scripts):
     # If stdin is not provided, assume a file is provided
     if sys.stdin.isatty():
-        test_scripts = sys.argv[1:]
         test_results = []
         use_env = os.environ.copy()
         use_env['PS4'] = DEFAULT_PS4
-        base_cmd = ['/bin/sh', '-x']
+
         for s in test_scripts:
             if not os.path.isfile(s):
                 raise OSError('"{}" does not exist, aborting!'.format(s))
-            proc = subprocess.Popen(base_cmd + [s],  # nosec
+            proc = subprocess.Popen(BASE_CMD + [s],  # nosec
                                     env=use_env, stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE)
             proc.wait()
             test_results.append(tuple(map(lambda x: x.decode('utf-8'),
                                           proc.communicate())))
-            print('------- stderr for "{}" -------'.format(s))
-            print(test_results[0][1])
-            print('')
     else:
-        try:
-            test_scripts = sys.argv[1:]
-        except IndexError:
-            test_scripts = []
         test_results = [('', '\n'.join([l for l in sys.stdin]))]
+    return test_results
 
+
+def get_executed_lines(test_results):
     # Extract lines which have been executed
     script_lines = {}
     for r in test_results:
@@ -222,11 +218,14 @@ if __name__ == '__main__':
                 script_lines[script].add(lineno)
             else:
                 script_lines[script] = {lineno}
+    return script_lines
 
+
+def get_lines_in_scripts(all_scripts):
     # Now check which lines matter
-    lines_to_cover = {script: set() for script in script_lines}
+    lines_to_cover = {script: set() for script in all_scripts}
 
-    for script in script_lines:
+    for script in all_scripts:
         with open(script, 'r') as script_file:
             data = '\n'.join([l.strip() for l in script_file.readlines()])
 
@@ -264,4 +263,15 @@ if __name__ == '__main__':
 
             # Ignore open/closing loop block items
             lines_to_cover[script].add(line_number + 1)
+    return lines_to_cover
+
+
+if __name__ == '__main__':
+    try:
+        test_scripts = sys.argv[1:]
+    except IndexError:
+        test_scripts = []
+    test_results = get_test_results(test_scripts)
+    script_lines = get_executed_lines(test_results)
+    lines_to_cover = get_lines_in_scripts([s for s in script_lines])
     display_results(lines_to_cover, script_lines)
