@@ -192,7 +192,8 @@ if __name__ == '__main__':
                                 env=use_env, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE)
         proc.wait()
-        test_results.append(proc.communicate())
+        test_results.append(tuple(map(lambda x: x.decode('utf-8'),
+                                      proc.communicate())))
         print('------- stderr for "{}" -------'.format(s))
         print(test_results[0][1])
         print('')
