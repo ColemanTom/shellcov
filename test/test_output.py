@@ -104,5 +104,5 @@ class TestOutput(unittest.TestCase):
                          '1-4,6-8,20')
 
     def test_get_range_string_as_list(self):
-        self.assertEqual(shell_cov.get_range_string([1,2,3,4,6,7,8,20]),
+        self.assertEqual(shell_cov.get_range_string([1, 2, 3, 4, 6, 7, 8, 20]),
                          '1-4,6-8,20')
