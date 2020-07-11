@@ -199,7 +199,7 @@ if __name__ == '__main__':
     else:
         try:
             test_scripts = sys.argv[1:]
-        except:
+        except IndexError:
             test_scripts = []
         test_results = [('', '\n'.join([l for l in sys.stdin]))]
 
