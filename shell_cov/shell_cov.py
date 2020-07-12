@@ -3,6 +3,7 @@ import re
 import subprocess  # nosec
 import sys
 from itertools import groupby
+from pathlib import Path
 from operator import itemgetter
 from re import DOTALL, MULTILINE, VERBOSE
 
@@ -266,11 +267,28 @@ def get_lines_in_scripts(all_scripts):
     return lines_to_cover
 
 
+def find_scripts(search_path):
+    if os.path.isfile(search_path):
+        return search_path
+    results = []
+    for suffix in ('sh', 'bash', 'ksh'):
+        results.extend(Path(search_path).rglob(f'test_*.{suffix}'))
+    return results
+
+
 if __name__ == '__main__':
+    # Get the paths to the test scripts
     try:
-        test_scripts = sys.argv[1:]
+        test_paths = sys.argv[1:]
     except IndexError:
-        test_scripts = []
+        test_paths = []
+    test_scripts = []
+    if not test_paths:
+        test_paths = ['.']
+
+    for p in test_paths:
+        test_scripts.extend(find_scripts(p))
+
     test_results = get_test_results(test_scripts)
     script_lines = get_executed_lines(test_results)
     lines_to_cover = get_lines_in_scripts([s for s in script_lines])
