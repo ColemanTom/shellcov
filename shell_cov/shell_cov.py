@@ -1,3 +1,4 @@
+import argparse
 import os
 import re
 import subprocess  # nosec
@@ -6,6 +7,9 @@ from itertools import groupby
 from pathlib import Path
 from operator import itemgetter
 from re import DOTALL, MULTILINE, VERBOSE
+from typing import Dict, List, Union
+
+VERSION = '0.0.0'
 
 DEFAULT_PS4 = '+PS4 + ${BASH_SOURCE} + ${SECONDS}S + L${LINENO} + '
 FILLER = '@@filler@@'
@@ -66,6 +70,29 @@ RE_FUNCTION = re.compile(r'''
     [^\S\r\n]*\n?[^\S\r\n]*        # whitespace, maybe a newline
     {?\s*\n                        # maybe a { with space and or newlines there
     ''', MULTILINE | VERBOSE)
+
+
+def parse_args(args: List[str]) -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="Generate shell coverage information.",
+        epilog=f"""
+If you are running this using existing script outputs, ensure your PS4 is correct.
+export PS4='{DEFAULT_PS4}'
+
+ShellCov Version = v{VERSION}
+"""
+    )
+
+    # Allow users to specify some script/path options
+    parser.add_argument("--only-paths", "-p", nargs="+", help="Space separated list of paths. Only scripts whose paths start with this prefix will be analysed.", metavar='PATH')
+    parser.add_argument("--replace-paths", nargs="+", help="Space separated list of colon separated paths. The left hand side is the original path prefix, the right hand side what to replace it with. E.g. --replace-paths /a/b/c/run:/home /a/b/c/d/run:/data", metavar='ORIG:REPLACE')
+
+    # Choose multiple ways to analyse results
+    group = parser.add_argument_group(title="Chose one of:")
+    exclusive_group = group.add_mutually_exclusive_group(required=True)
+    exclusive_group.add_argument("--test-scripts", "-t", nargs="+", help="Space separated list of test scripts to run", metavar='TEST_SCRIPT')
+    exclusive_group.add_argument("--canned-results", "-r", nargs="+", help="Space separated list of pre-generated outputs to analyse", metavar='RESULT')
+    return parser.parse_args(args)
 
 
 def get_range_string(items):
@@ -276,20 +303,33 @@ def find_scripts(search_path):
     return results
 
 
-if __name__ == '__main__':
-    # Get the paths to the test scripts
-    try:
-        test_paths = sys.argv[1:]
-    except IndexError:
-        test_paths = []
+def run_test_scripts(test_paths: List[str]) -> Dict[str, int]:
     test_scripts = []
-    if not test_paths:
-        test_paths = ['.']
 
     for p in test_paths:
         test_scripts.extend(find_scripts(p))
 
     test_results = get_test_results(test_scripts)
-    script_lines = get_executed_lines(test_results)
+    return get_executed_lines(test_results)
+
+def get_script_lines_from_canned_results(canned_results: List[str]) -> Dict[str, int]:
+    output = [_read_canned_results(p) for p in canned_results]
+    return get_executed_lines(output)
+
+
+def _read_canned_results(canned_result: str) -> str:
+    with open(canned_result) as f:
+         return ('', f.read())
+
+
+if __name__ == '__main__':
+    args = parse_args(sys.argv[1:])
+    if args.test_paths is not None:
+        # We need to run the test scripts to collect results
+        script_lines = run_test_scripts(args.test_paths)
+    else:
+        # Canned results must have been provided
+        script_lines = get_script_lines_from_canned_results(args.canned_results)
+
     lines_to_cover = get_lines_in_scripts([s for s in script_lines])
     display_results(lines_to_cover, script_lines)
