@@ -79,18 +79,24 @@ def parse_args(args: List[str]) -> argparse.ArgumentParser:
 If you are running this using existing script outputs, ensure your PS4 is correct.
 export PS4='{DEFAULT_PS4}'
 
+NOTE: For BASH, prior to v4.3alpha, PS4 gets truncated to 99 characters.
+      You will need to override the BASH_SOURCE in this file's DEFAULT_PS4 variable
+      to strip out some of the path from the script.
+      e.g. ${{BASH_SOURCE/some_path//script}}
+
 ShellCov Version = v{VERSION}
 """
     )
 
     # Allow users to specify some script/path options
-    parser.add_argument("--only-paths", "-p", nargs="+", help="Space separated list of paths. Only scripts whose paths start with this prefix will be analysed.", metavar='PATH')
-    parser.add_argument("--replace-paths", nargs="+", help="Space separated list of colon separated paths. The left hand side is the original path prefix, the right hand side what to replace it with. E.g. --replace-paths /a/b/c/run:/home /a/b/c/d/run:/data", metavar='ORIG:REPLACE')
+    parser.add_argument("--only-paths", "-p", nargs="+", help="Space separated list of paths. Only scripts whose paths start with this prefix will be analysed.\nThis helps filter out scripts which should not be analysed because they belong to a different library.", metavar='PATH')
+    parser.add_argument("--ignore-paths", nargs="+", help="Space separated list of paths to ignore. Any script which matches part of this will be ignored.", metavar='PATH')
+    parser.add_argument("--replace-paths", nargs="+", help="Space separated list of colon separated paths. The left hand side is the original path prefix, the right hand side what to replace it with. This can be useful to work around bugs in BASH prior to 4.3alpha or when you are running the script on a different platform to where results are being analysed. E.g. --replace-paths /a/b/c/run:/home /a/b/c/d/run:/data", metavar='ORIG:REPLACE')
 
     # Choose multiple ways to analyse results
     group = parser.add_argument_group(title="Chose one of:")
     exclusive_group = group.add_mutually_exclusive_group(required=True)
-    exclusive_group.add_argument("--test-scripts", "-t", nargs="+", help="Space separated list of test scripts to run", metavar='TEST_SCRIPT')
+    exclusive_group.add_argument("--test-paths", "-t", nargs="+", help="Space separated list of directories to search in for test scripts, or, test scripts to run. Test script filenames must start with 'test_'", metavar='TEST_SCRIPT')
     exclusive_group.add_argument("--canned-results", "-r", nargs="+", help="Space separated list of pre-generated outputs to analyse", metavar='RESULT')
     return parser.parse_args(args)
 
@@ -219,6 +225,7 @@ def get_test_results(test_scripts):
                                     env=use_env, stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE)
             proc.wait()
+            # TODO: Strip out the test script from the output
             test_results.append(tuple(map(lambda x: x.decode('utf-8'),
                                           proc.communicate())))
     else:
@@ -226,7 +233,7 @@ def get_test_results(test_scripts):
     return test_results
 
 
-def get_executed_lines(test_results):
+def get_executed_lines(test_results, path_include: List[str] =None, path_ignore:List[str]=None,path_replace: List[str] =None):
     # Extract lines which have been executed
     script_lines = {}
     for r in test_results:
@@ -236,16 +243,33 @@ def get_executed_lines(test_results):
             if not (line.startswith('+')
                     and line.strip('+').startswith("PS4 + ")):
                 continue
-            _, script, duration, lineno, _ = line.split(" + ", 4)
+            _, script, duration, line_number, _ = line.split(" + ", 4)
 
-            # Do not count the test script as a script
-            if script in test_scripts:
+            # If this path hasn't been included in the allow list, ignore it
+            if path_include is not None and not any(p in script for p in path_include):
+                # TODO: Insert log.debug informing that this script is being ignored
                 continue
-            lineno = int(lineno.replace('L', ''))
+
+            # If this script is in the ignore list, skip
+            if path_ignore is not None and any(p in script for p in path_ignore):
+                # TODO: Insert log.debug informing that this script is being ignored
+                continue
+
+            # Update the script path if required by the command line arguments.
+            # This might have been done because the location the script was run was
+            # different to where the coverage analysis is taking place, or because of
+            # bugs in BASH prior to 4.3alpha.
+            if path_replace is not None:
+                for p in path_replace:
+                    search, replacement = p.split(':', maxsplit=1)
+                    script = script.replace(search, replacement)
+
+            # Update the scripts dictionary with the line number
+            line_number = int(line_number.replace('L', ''))
             if script in script_lines:
-                script_lines[script].add(lineno)
+                script_lines[script].add(line_number)
             else:
-                script_lines[script] = {lineno}
+                script_lines[script] = {line_number}
     return script_lines
 
 
@@ -281,8 +305,8 @@ def get_lines_in_scripts(all_scripts):
 
         # Remove logic operators that don't count as lines
         data = shell_strip_logic(data)
-
         enumerator = enumerate(data.splitlines())
+
         # Look at each line now
         for line_number, line in enumerator:
             # Ignore blank lines
@@ -303,18 +327,19 @@ def find_scripts(search_path):
     return results
 
 
-def run_test_scripts(test_paths: List[str]) -> Dict[str, int]:
+def run_test_scripts(test_paths: List[str], path_include: List[str] =None,path_ignore:List[str]=None, path_replace: List[str] =None) -> Dict[str, int]:
     test_scripts = []
 
     for p in test_paths:
         test_scripts.extend(find_scripts(p))
 
     test_results = get_test_results(test_scripts)
-    return get_executed_lines(test_results)
+    return get_executed_lines(output, path_include, path_ignore, path_replace)
 
-def get_script_lines_from_canned_results(canned_results: List[str]) -> Dict[str, int]:
+
+def get_script_lines_from_canned_results(canned_results: List[str],path_include: List[str] =None,path_ignore:List[str]=None, path_replace: List[str] =None) -> Dict[str, int]:
     output = [_read_canned_results(p) for p in canned_results]
-    return get_executed_lines(output)
+    return get_executed_lines(output, path_include, path_ignore, path_replace)
 
 
 def _read_canned_results(canned_result: str) -> str:
@@ -326,10 +351,10 @@ if __name__ == '__main__':
     args = parse_args(sys.argv[1:])
     if args.test_paths is not None:
         # We need to run the test scripts to collect results
-        script_lines = run_test_scripts(args.test_paths)
+        script_lines = run_test_scripts(args.test_paths, args.only_paths, args.ignore_paths, args.replace_paths)
     else:
         # Canned results must have been provided
-        script_lines = get_script_lines_from_canned_results(args.canned_results)
+        script_lines = get_script_lines_from_canned_results(args.canned_results, args.only_paths, args.ignore_paths, args.replace_paths)
 
     lines_to_cover = get_lines_in_scripts([s for s in script_lines])
     display_results(lines_to_cover, script_lines)
