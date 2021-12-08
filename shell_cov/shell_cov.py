@@ -55,10 +55,10 @@ RE_LOGIC_OPERATOR = re.compile(r'''
     ''', MULTILINE | VERBOSE)
 RE_MULTI_LINE_QUOTE = re.compile(r'''
     (             # Make the whole match a group so findall can return it
-    [\S \t]*?     # any non line-break in front of it
+    [\S \t]*?     # any non line-break in front of the quote
     (["'])        # capture the start of the quote
-    (?:[^\2].*?)  # characters not including the closing quote
-    [^\\]\2       # end with a the opening quote, unescaped
+    (?:[^\2]*?)   # characters not including the closing quote
+    [^\\]?\2      # end with the opening quote, unescaped
     )
     ''', VERBOSE | MULTILINE | DOTALL)
 RE_FUNCTION = re.compile(r'''
