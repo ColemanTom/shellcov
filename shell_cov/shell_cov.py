@@ -19,6 +19,8 @@ COLUMN_HEADINGS = ['Name', 'Stmts', 'Miss', 'Cover', 'Missing']
 # All regex below assume that all lines in the search string have been trimmed
 RE_COMMENT = re.compile(r'''^#.*|(?<!["'\\{$])#.*''', MULTILINE)
 RE_ESCAPED_QUOTE = re.compile(r'''\\['"]''')
+RE_SET_XTRACE = re.compile(r"set +(-[a-zA-Z] )*(-[a-zA-Z]*?x|-o xtrace).*")
+
 # Two line continuation adjustments. One removes it because its blank
 # afterwards. The second is used to add a filler to the first line as a command
 # is being executed.
@@ -138,6 +140,10 @@ def shell_strip_escaped_quotes(text):
 
 def shell_strip_comments(text):
     return RE_COMMENT.sub('', text)
+
+
+def shell_strip_xtrace(text):
+    return RE_SET_XTRACE.sub('', text)
 
 
 def shell_strip_heredoc(text):
@@ -290,6 +296,9 @@ def get_lines_in_scripts(all_scripts):
 
         # Remove comments from the script, replacing with empty strings
         data = shell_strip_comments(data)
+
+        # Remove 'set -x' lines
+        data = shell_strip_xtrace(data)
 
         # Adjust line continuation
         data = shell_strip_line_continuation(data)
