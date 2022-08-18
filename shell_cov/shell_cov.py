@@ -270,8 +270,13 @@ def get_executed_lines(test_results, path_include: List[str] =None, path_ignore:
                     search, replacement = p.split(':', maxsplit=1)
                     script = script.replace(search, replacement)
 
-            # Update the scripts dictionary with the line number
             line_number = int(line_number.replace('L', ''))
+
+            # Ignore line number 0 as its not a real line number
+            if line_number == 0:
+                continue
+
+            # Update the scripts dictionary with the line number
             if script in script_lines:
                 script_lines[script].add(line_number)
             else:
