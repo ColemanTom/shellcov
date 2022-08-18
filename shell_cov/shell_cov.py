@@ -42,9 +42,9 @@ RE_HEREDOC = re.compile(r'''
     \3              # Closing capture string
     \s*$            # maybe some extra spaces
     )''', DOTALL | MULTILINE | VERBOSE)
-RE_LOGIC_OPERATOR = re.compile(r'''
+RE_LOGIC_OPERATOR = re.compile(rf'''
     ^(?:
-    [{}]|             # opening/closing block
+    [{{}}]|             # opening/closing block
     ;|                # semi-colon only line
     then|             # opening if block
     fi|               # closing if block
@@ -52,7 +52,7 @@ RE_LOGIC_OPERATOR = re.compile(r'''
     done|             # closing loop
     in|               # opening case statement
     esac|             # closing case statement
-    [^(\r\n\f]*\)     # option in case statement
+    (?!{FILLER})[^(\r\n\f]*\)     # option in case statement
     )[ \t;]*?$
     ''', MULTILINE | VERBOSE)
 RE_MULTI_LINE_QUOTE = re.compile(r'''
@@ -126,12 +126,16 @@ def shell_strip_line_continuation(text):
     # Line continuation marks the last line the executed line
     text = RE_LINE_CONTINUATION_REMOVE.sub('', text)
     for match in RE_LINE_CONTINUATION.findall(text):
-        text = _replace_multiline_string_filler_at_start(text, match)
+        text = _replace_multiline_string_filler_at_end(text, match)
     return text
 
 
 def _replace_multiline_string_filler_at_start(text, match):
     return text.replace(match, FILLER + '\n' * match.count('\n'), 1)
+
+
+def _replace_multiline_string_filler_at_end(text, match):
+    return text.replace(match, '\n' * match.count('\n') + FILLER, 1)
 
 
 def shell_strip_escaped_quotes(text):
